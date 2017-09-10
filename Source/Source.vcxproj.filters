@@ -75,6 +75,9 @@
     <ClCompile Include="AST\Scope.cpp">
       <Filter>源文件\AST</Filter>
     </ClCompile>
+    <ClCompile Include="Utils\Exceptions.cpp">
+      <Filter>源文件\Utils</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="Stable.h">
@@ -118,6 +121,9 @@
     </ClInclude>
     <ClInclude Include="AST\Scope.h">
       <Filter>头文件\AST</Filter>
+    </ClInclude>
+    <ClInclude Include="Utils\Exceptions.h">
+      <Filter>头文件\Utils</Filter>
     </ClInclude>
   </ItemGroup>
   <ItemGroup>

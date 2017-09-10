@@ -28,13 +28,13 @@ public:
 private:
 	/* Statements */
 	void visitStatement(Statement *node);
-	AstValue visitBlock(Block *node);
+	void visitBlock(Block *node);
 	void visitInStatement(InStatement *node);
 	void visitOutStatement(OutStatement *node);
 	void visitWhileStatement(WhileStatement *node);
 	void visitIfStatement(IfStatement *node);
 	AstValue visitRuturnStatement(ReturnStatement *node);
-	void restoreScopeStack();
+	void restoreStack();
 
 	/* Expression Statements */
 	AstValue visitExpressionStatement(ExpressionStatement *node);
@@ -54,5 +54,6 @@ private:
 
 private:
 	Scope *current_scope_ = nullptr;
+	std::stack<Block *> block_stack_;
 	std::stack<Scope *> scope_stack_;
 };

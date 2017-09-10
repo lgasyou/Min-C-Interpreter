@@ -28,11 +28,5 @@ void *ZoneObject::operator new(std::size_t size) {
 
 // static
 void ZoneObject::operator delete(void *block) noexcept {
-	auto beg = zoneInstance.objects_.begin();
-	auto end = zoneInstance.objects_.end();
-	auto iter = std::find(beg, end, block);
-	if (iter != end) {
-		*iter = nullptr;
-	}
 	free(block);
 }

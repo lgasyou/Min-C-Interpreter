@@ -15,6 +15,9 @@ AstValue::AstValue(const std::string &val) {
 	var.string = new std::string(val);
 }
 
+AstValue::AstValue(const char *str)
+	: AstValue(std::string(str)) {}
+
 AstValue::AstValue(bool boolean)
 	: AstValue(static_cast<int>(boolean)) {}
 
@@ -119,4 +122,6 @@ TEST_CASE(AstValue) {
 	ASSERT_EQ(AstValue("ello"), AstValue("hello") - AstValue("h"));
 	ASSERT_EQ(AstValue("ol"), AstValue("lol") - AstValue("l"));
 	ASSERT_EQ(AstValue("hello"), AstValue("hello") - AstValue("x"));
+
+	ASSERT_EQ(AstValue(16), (AstValue(2) ^ AstValue(4)));
 }

@@ -29,8 +29,6 @@ int main(int argc, char *argv[]) {
 
 #endif // UNIT_TEST == 1
 	system("pause");
+	std::cout << "回收垃圾中请稍等";
 	return 0;
 }
-
-// return
-// 表达式求值

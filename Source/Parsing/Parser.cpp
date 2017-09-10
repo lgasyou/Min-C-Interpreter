@@ -1,6 +1,7 @@
 #include "Parser.h"
 #include "AST/Scope.h"
 #include "AST/Variable.h"
+#include "Utils/Exceptions.h"
 #include <algorithm>
 
 ExpressionStatement *Parser::newMainCall() {
@@ -11,7 +12,7 @@ ExpressionStatement *Parser::newMainCall() {
 }
 
 AstNode *Parser::parse() {
-	auto b = newBlock();
+	auto b = newBlock(0);
 	if (!has_main_call_) {
 		b->addStatement(newMainCall());
 	}
@@ -29,10 +30,9 @@ void Parser::eat(Token::Type tokenType) {
 		current_token_ = scanner_.scan();
 		return;
 	}
-
-	DBG_PRINT << "tokenType: " << Token::Name(tokenType) << " "
-		<< "current_token.type: " << Token::Name(current_token_.type) << "\n";
-	UNREACHABLE();
+	else {
+		throw EatException(current_token_.line, tokenType);
+	}
 }
 
 const Token &Parser::peek() {
@@ -84,7 +84,7 @@ Statement *Parser::newStatement() {
 		break;
 
 	default:
-		UNREACHABLE();
+		throw StatementException(current_token_.line);
 	}
 
 	return node;
@@ -145,7 +145,7 @@ Statement *Parser::newOutStatement() {
 			break;
 
 		default:
-			UNREACHABLE();
+			throw OutException(token.line);
 		}
 	}
 
@@ -180,7 +180,7 @@ Statement *Parser::newOutStatement() {
 		break;
 
 	default:
-		UNREACHABLE();
+		throw OutException(token.line);
 	}
 
 	return new OutStatement(promptString, repeatTimes, outVeriableProxy, argNum, token.line);
@@ -188,13 +188,22 @@ Statement *Parser::newOutStatement() {
 
 Statement *Parser::newInStatement() {
 	Token token = current_token_;
+	if (peek().type != Token::STRING_LITERAL && peek().type != Token::IDENTIFIER){
+		throw InException(token.line);
+	}
 	eat(Token::IN);
 	Literal *promptString = nullptr;
 	VariableProxy *variable = nullptr;
 	if (current_token_.type == Token::STRING_LITERAL) {
 		promptString = newLiteral();
 		eat(Token::STRING_LITERAL);
+		if (current_token_.type != Token::COMMA) {
+			throw InException(token.line);
+		}
 		eat(Token::COMMA);
+	}	
+	if (current_token_.type != Token::IDENTIFIER) {
+		throw InException(token.line);
 	}
 	variable = newVariableProxy();
 	eat(Token::IDENTIFIER);
@@ -207,7 +216,7 @@ Statement *Parser::newWhileStatement() {
 	Expression *whileCondition = nullptr;
 	Block *whileBody = nullptr;
 	whileCondition = parseExpression();
-	whileBody = newBlock();
+	whileBody = newBlock(token.line);
 	return new WhileStatement(whileCondition, whileBody, token.line);
 }
 
@@ -218,20 +227,25 @@ Statement *Parser::newIfStatement() {
 	Block *thenCondition = nullptr;
 	Block *elseStatement = nullptr;
 	if (current_token_.type == Token::LBRACE) {
-		thenCondition = newBlock();
+		thenCondition = newBlock(token.line);
 	}
 	if (current_token_.type == Token::ELSE) {
 		eat(Token::ELSE);
-		elseStatement = newBlock();
+		elseStatement = newBlock(token.line);
 	}
 	return new IfStatement(condition, thenCondition, elseStatement, token.line);
 }
 
 Statement *Parser::newReturnStatememt() {
 	eat(Token::RETURN);
-	auto ret = new ReturnStatement(parseExpression());
-	eat(Token::SEMICOLON);
-	return ret;
+	if (current_token_.type == Token::SEMICOLON) {
+		eat(Token::SEMICOLON);
+		return new ReturnStatement(nullptr);
+	} else {
+		auto ret = new ReturnStatement(parseExpression());
+		eat(Token::SEMICOLON);
+		return ret;
+	}
 }
 
 VariableProxy *Parser::newVariableProxy() {
@@ -265,14 +279,16 @@ Expression *Parser::newCall() {
 	eat(Token::IDENTIFIER);
 	eat(Token::LPAREN);
 	std::vector<Expression *> args;
-	while (current_token_.type != Token::RPAREN) {
-		Expression *arg = (current_token_.type == Token::IDENTIFIER) ? 
-			static_cast<Expression *>(newVariableProxy()) : newLiteral();
+	while (current_token_.type != Token::RPAREN 
+		&& current_token_.type != Token::EOS) {
+		Expression *arg = parseExpression();
 		args.push_back(arg);
-		eat(current_token_.type);
 		if (current_token_.type == Token::COMMA) {
 			eat(Token::COMMA);
 		}
+	}
+	if (current_token_.type != Token::RPAREN) {
+		throw FuncDecException(token.line);
 	}
 	eat(Token::RPAREN);
 	return new Call(functionNameProxy, args, token.line);
@@ -292,6 +308,12 @@ std::vector<Declaration *> Parser::newDeclarations() {
 		d = newVariableDeclaration(name, typeToken);
 		decls.push_back(d);
 		while (current_token_.type != Token::SEMICOLON) {
+			if (current_token_.type != Token::COMMA) {
+				if (current_token_.type == Token::LPAREN) {
+					throw FuncDecException(typeToken.line);
+				}
+				throw EatException(typeToken.line, Token::SEMICOLON);
+			}
 			eat(Token::COMMA);
 			name = newVariableProxy();
 			d = newVariableDeclaration(name, typeToken);
@@ -330,7 +352,7 @@ static inline bool IsBlockEnd(Token::Type t) {
 	return t == Token::RBRACE;
 }
 
-Block *Parser::newBlock() {
+Block *Parser::newBlock(int line) {
 	auto scope = new Scope(current_scope_);
 	current_scope_ = scope;
 
@@ -339,15 +361,15 @@ Block *Parser::newBlock() {
 	}
 
 	if (IsBlockStart(current_token_.type)) {
-		std::vector<Statement *> block{ newBlock() };
-		return new Block(block, scope);
+		std::vector<Statement *> block{ newBlock(line) };
+		return new Block(block, scope, current_token_.line);
 	}
 
 	const auto &statements = parseBlockBody(scope);
 	if (IsBlockEnd(current_token_.type)) {
 		eat(Token::RBRACE);
 	}
-	return new Block(statements, scope);
+	return new Block(statements, scope, line);
 }
 
 Declaration *Parser::newFunctionDeclaration(VariableProxy *var, const Token &tok) {
@@ -375,11 +397,13 @@ Declaration *Parser::newFunctionDeclaration(VariableProxy *var, const Token &tok
 			break;
 
 		default:
-			UNREACHABLE();
+			throw FuncDecException(tok.line);
 		}
 	}
 	eat(Token::RPAREN);
-	functionBlock = newBlock();
+
+	functionBlock = newBlock(tok.line);
+	functionBlock->setIsFunctionBlock(true);
 
 	return new FunctionDeclaration(var, tok, argumentsNodes, functionBlock, token.line);
 }
@@ -412,8 +436,7 @@ Expression *Parser::parseFactor() {
 			return new VariableProxy(token, token.line);
 		}
 
-	case Token::LPAREN:
-	{
+	case Token::LPAREN: {
 		eat(Token::LPAREN);
 		Expression *node = parseExpression();
 		eat(Token::RPAREN);
@@ -421,7 +444,7 @@ Expression *Parser::parseFactor() {
 	}
 
 	default:
-		UNREACHABLE();
+		throw OpException(token.line);
 	}
 }
 

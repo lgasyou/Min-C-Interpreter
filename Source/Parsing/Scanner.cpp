@@ -1,4 +1,5 @@
 #include "Scanner.h"
+#include "Utils\Exceptions.h"
 #include <cctype>
 
 // Returns true if pos is out of str's range.
@@ -10,12 +11,11 @@ static inline bool isIdentifierBegin(char ch) {
 	return isalpha(ch) || ch == '_';
 }
 
-Token Scanner::scan() {
+Token Scanner::scan(){
 	while (current_char_ != '\0') {
 		//DBG_PRINT << current_char_;
 		switch (current_char_) {
 		case '\n':
-			++current_pos_;
 			/* No Break there! */
 
 		case ' ':
@@ -115,7 +115,7 @@ Token Scanner::scan() {
 				advance();
 				return Token(Token::AND, current_pos_);
 			}
-			UNREACHABLE();
+			throw EatException(current_pos_, Token::AND);
 
 		case '|':
 			// | ||
@@ -124,7 +124,7 @@ Token Scanner::scan() {
 				advance();
 				return Token(Token::OR, current_pos_);
 			}
-			UNREACHABLE();
+			throw EatException(current_pos_, Token::OR);
 
 		case '!':
 			// !
@@ -149,7 +149,7 @@ Token Scanner::scan() {
 			if (isdigit(current_char_)) {
 				return scanNumber();
 			}
-			UNREACHABLE();
+			throw ScanException(current_pos_);
 		}
 	}
 	return Token::EOS;
@@ -230,6 +230,9 @@ Token Scanner::scanIdentifierOrKeyword() {
 
 void Scanner::advance() {
 	cursor_ += 1;
+	if (current_char_ == '\n') {
+		current_pos_++;
+	}
 	current_char_ = outOfRange(cursor_, text_) ? 0 : text_[cursor_];
 }
 

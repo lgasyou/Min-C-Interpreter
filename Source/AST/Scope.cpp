@@ -28,11 +28,12 @@ void Scope::declarateVariable(VariableDeclaration *decl) {
 	String name = decl->variableProxy()->variable()->name();
 	variables_[name] = ObjectFactory(decl->variableType());
 }
+
 void Scope::declarateFunction(FunctionDeclaration *decl) {
 	String name = decl->variableProxy()->variable()->name();
 	auto function = variables_[name];
 	if (function == nullptr) {
-		variables_[name] = new FunctionObject(decl->functionBody(), decl->arguments());
+		variables_[name] = new FunctionObject(decl->functionBody(), decl->arguments(), decl->tokenType());
 	} else {
 		variables_[name]->AsFunction()->addOverloadedFunction(decl->functionBody(), decl->arguments());
 	}
@@ -52,4 +53,3 @@ void Scope::declarateLocal(Declaration *decl) {
 		UNREACHABLE();
 	}
 }
-

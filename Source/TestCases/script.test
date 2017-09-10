@@ -1,1 +1,3 @@
-out 10, "Hello,world!\n";
+int main() {
+	out 10, "Hello,world!\n";
+}

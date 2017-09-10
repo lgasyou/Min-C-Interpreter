@@ -3,6 +3,7 @@
 #include "Variable.h"
 #include "Objects.h"
 #include "Scope.h"
+#include "Utils\Exceptions.h"
 #include <map>
 
 // A macro used to cast NODE to NODE_TYPE* 
@@ -15,20 +16,33 @@ void Analyzer::visit(AstNode *root) {
 	VISIT(Statement, root);
 }
 
-AstValue Analyzer::visitBlock(Block *node) {
+void Analyzer::visitBlock(Block *node) {
+	node->setIsBlockEnd(false);
+	node->setReturnValue(AstValue(AstValue::VOID));
+
+	block_stack_.push(node);
+
+	auto cs = Scope::CopyFrom(node->scope());
+	cs->setOuterScope(current_scope_);
+	current_scope_ = cs;
 	scope_stack_.push(current_scope_);
-	current_scope_ = node->scope();
+
 	for (auto s : node->statements()) {
+		if (node->isBlockEnd()) {
+			break;
+		}
+
 		if (s->nodeType() == AstNode::RETURN) {
-			auto retValue = visitRuturnStatement((ReturnStatement *)s);
-			restoreScopeStack();
-			return retValue;
+			auto rval = visitRuturnStatement((ReturnStatement *)s);
+			node->setReturnValue(rval);
+			node->setIsBlockEnd(true);
+			break;
 		}
 		visitStatement(s);
 	}
-	restoreScopeStack();
-	return AstValue(AstValue::VOID);
+	restoreStack();
 }
+
 
 void Analyzer::visitStatement(Statement *node) {
 	switch (node->nodeType()) {
@@ -159,13 +173,24 @@ void Analyzer::visitIfStatement(IfStatement *node) {
 }
 
 AstValue Analyzer::visitRuturnStatement(ReturnStatement *node) {
-	return visitExpression(node->returnExpr());
+	if (node->returnExpr()) {
+		return visitExpression(node->returnExpr());
+	}
+	return AstValue(AstValue::VOID);
 }
 
-void Analyzer::restoreScopeStack() {
-	auto callerScope = scope_stack_.top();
-	current_scope_ = callerScope;
+void Analyzer::restoreStack() {
+	Block *poppedBlock = block_stack_.top();
+	block_stack_.pop();
 	scope_stack_.pop();
+	if (!block_stack_.empty()) {
+		auto b = block_stack_.top();
+		if (!poppedBlock->isFunctionBlock()) {
+			b->setIsBlockEnd(poppedBlock->isBlockEnd());
+		}
+		b->setReturnValue(poppedBlock->returnValue());
+		current_scope_ = scope_stack_.top();
+	}
 }
 
 AstValue Analyzer::visitExpressionStatement(ExpressionStatement *node) {
@@ -195,11 +220,15 @@ AstValue Analyzer::visitCall(Call *node) {
 	auto funName = node->variableProxy()->variable()->name();
 	auto argValues = getCallArgValues(node->arguments());
 	auto function = current_scope_->lookup(funName);
+	if (function->type() != Object::FUNCTION) {
+		throw FuncDecException(node->position());
+	}
 	auto readyBlock = function->AsFunction()->setup(argValues);
-	return VISIT(Block, readyBlock);
+	visitBlock(readyBlock);
+	return readyBlock->returnValue();
 }
 
-std::vector<AstValue> Analyzer::getCallArgValues(const std::vector<Expression*> &argDecls) {
+std::vector<AstValue> Analyzer::getCallArgValues(const std::vector<Expression *> &argDecls) {
 	std::vector<AstValue> ret;
 	for (auto e : argDecls) {
 		ret.push_back(visitExpression(e));

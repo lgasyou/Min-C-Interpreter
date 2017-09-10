@@ -3,9 +3,9 @@
 #include "Stable.h"
 #include <vector>
 #include "Parsing/Token.h"
+#include "AstValue.h"
 #include "Utils/Zone.h"
 
-class AstValue;
 class Variable;
 class VariableProxy;
 class Literal;
@@ -89,18 +89,29 @@ private:
 
 class Block final : public Statement {
 public:
-	Block(const std::vector<Statement *> &stmts, Scope *scope, int position = 0)
+	Block(const std::vector<Statement *> &stmts, Scope *scope, int position)
 		: Statement(position, BLOCK), statements_(stmts), scope_(scope) {}
 
 	Scope *scope() const { return scope_; }
 	void setScope(Scope *s) { scope_ = s; }
 	void addStatement(Statement *s) { statements_.push_back(s); }
 
+	bool isFunctionBlock() const { return is_function_block_; }
+	bool isBlockEnd() const { return is_block_end_; }
+	const AstValue &returnValue() const { return return_value_; }
+
+	void setIsFunctionBlock(bool b) { is_function_block_ = b; }
+	void setIsBlockEnd(bool b) { is_block_end_ = b; }
+	void setReturnValue(const AstValue &v) { return_value_ = v; }
+
 	const std::vector<Statement *> &statements() const { return statements_; }
 
-public:
+private:
 	std::vector<Statement *> statements_;
 	Scope *scope_;
+	AstValue return_value_ = AstValue(AstValue::VOID);
+	bool is_function_block_ = false;
+	bool is_block_end_ = false;
 };
 
 

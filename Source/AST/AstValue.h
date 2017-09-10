@@ -3,6 +3,7 @@
 #include "Stable.h"
 #include <string>
 #include <iostream>
+#include <cmath>
 #include "Objects.h"
 #include "Parsing/Token.h"
 #include "Utils/Zone.h"
@@ -21,6 +22,7 @@ public:
 	explicit AstValue(int integer = 0);
 	explicit AstValue(float real);
 	explicit AstValue(const std::string &string);
+	explicit AstValue(const char *str);
 	explicit AstValue(bool boolean);
 	explicit AstValue(Type type);
 	explicit AstValue(Token::Type type);
@@ -41,7 +43,7 @@ public:
 	AstValue operator*(const AstValue &rhs);
 	AstValue operator/(const AstValue &rhs);
 	AstValue operator%(const AstValue &rhs);
-
+	AstValue operator^(const AstValue &rhs);
 
 	AstValue operator==(const AstValue &rhs);
 	AstValue operator!=(const AstValue &rhs);
@@ -182,8 +184,12 @@ inline AstValue AstValue::operator%(const AstValue &rhs) {
 	UNREACHABLE();
 }
 
+inline AstValue AstValue::operator^(const AstValue &rhs) {
+	return AstValue(std::powf(toReal(), rhs.toReal()));
+}
+
 inline AstValue AstValue::operator==(const AstValue &rhs) {
-	if (type() != STRING || rhs.type() != STRING) {
+	if (type() != STRING && rhs.type() != STRING) {
 		return AstValue(toReal() == rhs.toReal());
 	}
 	return AstValue(toString() == rhs.toString());
@@ -194,14 +200,14 @@ inline AstValue AstValue::operator!=(const AstValue &rhs) {
 }
 
 inline AstValue AstValue::operator<(const AstValue &rhs) {
-	if (type() != STRING || rhs.type() != STRING) {
+	if (type() != STRING && rhs.type() != STRING) {
 		return AstValue(toReal() < rhs.toReal());
 	}
 	return AstValue(toString() < rhs.toString());
 }
 
 inline AstValue AstValue::operator<=(const AstValue &rhs) {
-	if (type() != STRING || rhs.type() != STRING) {
+	if (type() != STRING && rhs.type() != STRING) {
 		return AstValue(toReal() <= rhs.toReal());
 	}
 	return AstValue(toString() <= rhs.toString());
